@@ -36,7 +36,30 @@ S2T_PORT=8100 ./run.sh   # if port 8000 is taken
 without a system-wide CUDA install. The first transcription downloads the selected model
 (~1.6 GB for the default) and the UI shows a "preparing the model" step while it does.
 
-Open the page, drop in a file, pick a model, press **ابدأ التحويل**.
+Open the page, type the password (see below), drop in a file, pick a model, press
+**ابدأ التحويل**.
+
+## Password
+
+The app is closed by default in this install: `S2T_PASSWORD` in `.env` is the one shared
+password, and nothing — page, API or SSE stream — is reachable without it. Only the login
+page and the assets it needs are public.
+
+```bash
+cp .env.example .env     # then edit S2T_PASSWORD
+S2T_PASSWORD= ./run.sh   # or: run this once with the gate switched off
+```
+
+- A correct password sets a signed, `HttpOnly` session cookie valid for `S2T_SESSION_SECONDS`
+  (12 hours). The password itself is never stored in the cookie.
+- **Three wrong guesses lock that client out for `S2T_LOCKOUT_SECONDS` (15 minutes).** While
+  locked, even the correct password is refused — the login page counts the lock down.
+- Counters and the cookie-signing key are in memory. Restarting the server clears every
+  lock and every session, which is also how you recover if you lock yourself out.
+- Lockouts are counted per client address, and they do not touch sessions that are already
+  signed in.
+- `.env` is gitignored. The password is compared with `hmac.compare_digest`, but it travels
+  in clear text over plain HTTP — put the app behind TLS before exposing it beyond localhost.
 
 ## Models
 
@@ -94,6 +117,14 @@ All optional, all read at startup.
 | `S2T_WORK_DIR` | `./work` | Scratch space for uploads (files are deleted after each job) |
 | `S2T_MODEL_DIR` | `./models` | Where model weights are cached; set to `""` to use the shared Hugging Face cache |
 | `S2T_HOST` / `S2T_PORT` | `127.0.0.1` / `8000` | Bind address, read by `run.sh` |
+| `S2T_PASSWORD` | *(empty)* | Login password; empty means no login page at all |
+| `S2T_MAX_ATTEMPTS` | `3` | Wrong guesses before a client is locked out |
+| `S2T_LOCKOUT_SECONDS` | `900` | How long that lockout lasts |
+| `S2T_SESSION_SECONDS` | `43200` | How long a successful login stays valid |
+| `S2T_ENV_FILE` | `./.env` | Where to read the file above from |
+
+Every one of these can come from `.env` instead (see `.env.example`). A real environment
+variable always wins over the file, so `S2T_PASSWORD= ./run.sh` opens the app for one run.
 
 ## API
 
@@ -105,6 +136,16 @@ All optional, all read at startup.
 | `GET` | `/api/jobs/{id}/download?fmt=txt\|srt\|vtt` | Transcript as a file |
 | `DELETE` | `/api/jobs/{id}` | Cancel and forget a job |
 | `GET` | `/api/models`, `/api/health` | Metadata for the UI; runtime and device info |
+| `POST` | `/api/login` | Form `password` → session cookie; `401` with attempts left, `429` when locked |
+| `POST` | `/api/logout` | Drops the session cookie |
+
+With a password set, every row above answers `401` without the session cookie, and browser
+navigations are redirected to `/login`:
+
+```bash
+curl -c jar -d "password=…" http://127.0.0.1:8000/api/login
+curl -b jar http://127.0.0.1:8000/api/models
+```
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/transcribe \
@@ -139,8 +180,9 @@ app/
   jobs.py         job records, SSE fan-out, TTL purge
   worker.py       the pipeline: convert → load → decode → publish
   formats.py      segments → TXT / SRT / VTT
-  main.py         routes
-  static/         index.html, styles.css, app.js (no build step)
+  auth.py         password check, session cookies, lockout counters
+  main.py         routes + the password gate
+  static/         index.html, login.html, styles.css, app.js, login.js (no build step)
   static/fonts/   vendored IBM Plex Sans Arabic + Noto Naskh Arabic (OFL)
 tests/            pytest suite
 docs/superpowers/specs/   design document

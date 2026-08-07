@@ -14,11 +14,18 @@ from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
 from .audio import SUPPORTED_EXTENSIONS, AudioError, is_supported_extension, require_ffmpeg
+from .auth import SESSION_COOKIE, Gatekeeper
 from .config import (
     DEFAULT_MODEL,
     LANGUAGES,
@@ -38,13 +45,43 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 UPLOAD_CHUNK = 1024 * 1024
 PURGE_INTERVAL_SECONDS = 60
 
+# Reachable without a session, because the login page itself needs them.
+PUBLIC_PATHS = frozenset({"/login", "/api/login", "/favicon.ico"})
+
+
+def _arabic_attempts(count: int) -> str:
+    """Arabic counts one, two and many differently; "بقيت 2 محاولة" reads wrong."""
+    if count == 1:
+        return "بقيت محاولة واحدة"
+    if count == 2:
+        return "بقيت محاولتان"
+    return f"بقيت {count} محاولات"
+
+
+def _arabic_minutes(seconds: int) -> str:
+    minutes = max(1, round(seconds / 60))
+    if minutes == 1:
+        return "دقيقة"
+    if minutes == 2:
+        return "دقيقتين"
+    if minutes <= 10:
+        return f"{minutes} دقائق"
+    return f"{minutes} دقيقة"
+
 
 def create_app(transcriber: SupportsTranscription | None = None) -> FastAPI:
     settings = get_settings()
+    gate = Gatekeeper(
+        password=settings.password,
+        max_attempts=settings.max_attempts,
+        lockout_seconds=settings.lockout_seconds,
+        session_seconds=settings.session_seconds,
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.settings = settings
+        app.state.gate = gate
         app.state.transcriber = transcriber or Transcriber(settings)
         app.state.registry = JobRegistry(ttl_seconds=settings.job_ttl_seconds)
         # One decode at a time: a 4 GB GPU cannot hold two large models.
@@ -79,6 +116,85 @@ def create_app(transcriber: SupportsTranscription | None = None) -> FastAPI:
 
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+    # -- password gate -----------------------------------------------------
+
+    @app.middleware("http")
+    async def require_session(request: Request, call_next):
+        """Nothing but the login page and its assets is reachable unauthenticated."""
+        path = request.url.path
+        if not gate.enabled or path in PUBLIC_PATHS or path.startswith("/static/"):
+            return await call_next(request)
+        if gate.accepts(request.cookies.get(SESSION_COOKIE)):
+            return await call_next(request)
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "الجلسة منتهية. سجّل الدخول من جديد."}, 401)
+        # A browser asking for a page gets sent to the form, not a bare 401.
+        return RedirectResponse("/login", status_code=303)
+
+    @app.get("/login", include_in_schema=False)
+    async def login_page(request: Request) -> Response:
+        if not gate.enabled or gate.accepts(request.cookies.get(SESSION_COOKIE)):
+            return RedirectResponse("/", status_code=303)
+        page = STATIC_DIR / "login.html"
+        if not page.is_file():  # pragma: no cover - only if the build is broken
+            raise HTTPException(status_code=500, detail="صفحة الدخول غير موجودة.")
+        return FileResponse(page, media_type="text/html; charset=utf-8")
+
+    @app.post("/api/login", include_in_schema=False)
+    async def login(request: Request, password: str = Form("")) -> JSONResponse:
+        if not gate.enabled:
+            return JSONResponse({"ok": True})
+
+        client = request.client.host if request.client else "unknown"
+        result = gate.attempt(client, password)
+
+        if result.locked:
+            response = JSONResponse(
+                {
+                    "ok": False,
+                    "locked": True,
+                    "retry_after": result.locked_seconds,
+                    "detail": (
+                        f"تم قفل الدخول بعد {settings.max_attempts} محاولات خاطئة. "
+                        f"حاول مرة أخرى بعد {_arabic_minutes(result.locked_seconds)}."
+                    ),
+                },
+                status_code=429,
+            )
+            response.headers["Retry-After"] = str(result.locked_seconds)
+            return response
+
+        if not result.ok:
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "locked": False,
+                    "remaining": result.remaining,
+                    "detail": (
+                        "كلمة المرور غير صحيحة. "
+                        f"{_arabic_attempts(result.remaining)} قبل القفل."
+                    ),
+                },
+                status_code=401,
+            )
+
+        response = JSONResponse({"ok": True})
+        response.set_cookie(
+            SESSION_COOKIE,
+            result.token,
+            max_age=settings.session_seconds,
+            httponly=True,
+            samesite="lax",
+            path="/",
+        )
+        return response
+
+    @app.post("/api/logout", include_in_schema=False)
+    async def logout() -> Response:
+        response = Response(status_code=204)
+        response.delete_cookie(SESSION_COOKIE, path="/")
+        return response
 
     # -- dependencies ------------------------------------------------------
 
@@ -125,6 +241,7 @@ def create_app(transcriber: SupportsTranscription | None = None) -> FastAPI:
                 "status": "ok",
                 "version": __version__,
                 "runtime": transcriber.runtime_info(),
+                "auth": gate.enabled,
                 "settings": {
                     "default_model": app_settings.default_model,
                     "beam_size": app_settings.beam_size,

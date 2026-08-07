@@ -186,6 +186,8 @@ body {
 
 .brand { display: flex; align-items: center; gap: 0.9rem; }
 
+.masthead-tools { display: flex; align-items: center; gap: 0.5rem; }
+
 .logo { flex: none; display: block; width: 2.75rem; height: 2.75rem; }
 .logo svg { width: 100%; height: 100%; display: block; filter: drop-shadow(var(--shadow-sm)); }
 .logo-plate { fill: var(--accent); }
@@ -497,6 +499,60 @@ button, .dl {
 .ghost[aria-disabled="true"] { opacity: 0.4; pointer-events: none; }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- login gate ---------- */
+
+.gate-body { display: grid; place-items: center; min-height: 100vh; }
+
+.gate { width: min(26rem, 100% - 2rem); padding-block: 2rem; }
+
+.gate-card {
+  margin-block-end: 0;
+  padding: 2rem 1.75rem;
+  text-align: center;
+  box-shadow: var(--shadow-lift);
+}
+
+.gate-logo { margin-inline: auto; margin-block-end: 0.9rem; }
+
+.gate-card h1 { font-size: 1.4rem; }
+.gate-card .sub { margin-block-end: 1.5rem; }
+
+.gate-form { display: flex; flex-direction: column; gap: 0.9rem; text-align: start; }
+
+input[type="password"] {
+  font: inherit;
+  font-size: 1.05rem;
+  width: 100%;
+  color: var(--text);
+  background: var(--surface-sunk);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem;
+  /* The password is Latin: keep the caret and the dots left-to-right. */
+  direction: ltr;
+  letter-spacing: 0.08em;
+  transition: border-color 140ms ease;
+}
+
+input[type="password"]:hover { border-color: var(--border-strong); }
+input[type="password"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+input[type="password"]:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.gate-form .primary { width: 100%; padding-block: 0.65rem; }
+
+.gate-error {
+  margin: 1rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.gate-hint { margin: 1rem 0 0; color: var(--muted); font-size: 0.8rem; }
 
 /* ---------- status ---------- */
 

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>تحويل الصوت إلى نص</title>
+  <meta name="theme-color" content="#f0eee6" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#1b1a18" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" href="/static/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="masthead">
+      <div class="brand">
+        <!-- The mark: a waveform on the right (the sound) resolving into text
+             lines on the left — the page's whole job in one glyph. -->
+        <span class="logo" aria-hidden="true">
+          <svg viewBox="0 0 44 44" role="img">
+            <rect width="44" height="44" rx="13" class="logo-plate" />
+            <g class="logo-wave" stroke-linecap="round" stroke-width="2.6" fill="none">
+              <path d="M31.5 15.5v13" />
+              <path d="M26.5 12v20" />
+              <path d="M21.5 17.5v9" />
+            </g>
+            <g class="logo-text" stroke-linecap="round" stroke-width="2.6" fill="none">
+              <path d="M16.5 18h-5" />
+              <path d="M16.5 26h-3" />
+            </g>
+          </svg>
+        </span>
+        <div class="brand-text">
+          <h1>تحويل الصوت إلى نص</h1>
+          <p class="sub">فرّغ تسجيلاتك العربية إلى نص مكتوب — محلياً على جهازك بالكامل.</p>
+        </div>
+      </div>
+      <span class="badge" id="device-badge" title="وحدة المعالجة المستخدمة">…</span>
+    </header>
+
+    <main>
+      <section class="card">
+        <div class="dropzone" id="dropzone" tabindex="0" role="button"
+             aria-label="اختر ملفاً صوتياً أو أفلته هنا">
+          <span class="dz-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="dz-icon">
+              <path d="M12 16V4m0 0L8 8m4-4 4 4" fill="none" stroke="currentColor"
+                    stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" fill="none"
+                    stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <p class="dz-title">أفلت الملف الصوتي هنا، أو اضغط للاختيار</p>
+          <p class="dz-hint" id="dz-hint">MP3, WAV, M4A, OGG, FLAC, WebM, MP4…</p>
+          <input type="file" id="file-input" accept="audio/*,video/*" hidden />
+        </div>
+
+        <div class="file-chip" id="file-chip" hidden>
+          <svg viewBox="0 0 24 24" class="chip-icon" aria-hidden="true">
+            <path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="1.7"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="7" cy="18" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/>
+            <circle cx="17" cy="16" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/>
+          </svg>
+          <span class="file-name" id="file-name"></span>
+          <span class="file-size" id="file-size" dir="ltr"></span>
+          <button type="button" class="chip-clear" id="file-clear" aria-label="إزالة الملف">✕</button>
+        </div>
+
+        <div class="section-head"><span>النموذج</span></div>
+        <div class="model-options" id="model-options" role="radiogroup" aria-label="النموذج"></div>
+
+        <div class="controls">
+          <label class="field">
+            <span>اللغة</span>
+            <span class="select-wrap">
+              <select id="language-select"></select>
+              <svg viewBox="0 0 24 24" class="select-arrow" aria-hidden="true">
+                <path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </label>
+          <label class="field">
+            <span>العملية</span>
+            <span class="select-wrap">
+              <select id="task-select"></select>
+              <svg viewBox="0 0 24 24" class="select-arrow" aria-hidden="true">
+                <path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.8"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="primary" id="start-btn" disabled>ابدأ التحويل</button>
+          <button type="button" class="ghost" id="cancel-btn" hidden>إلغاء</button>
+        </div>
+      </section>
+
+      <section class="card status-card" id="status-card" hidden>
+        <div class="status-row">
+          <span class="status-label" id="status-label"></span>
+          <span class="status-meta" id="status-meta" dir="ltr"></span>
+        </div>
+        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+             id="progress" aria-valuenow="0">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </section>
+
+      <section class="alert" id="alert" hidden>
+        <strong id="alert-title"></strong>
+        <p id="alert-body"></p>
+        <details id="alert-details" hidden>
+          <summary>تفاصيل تقنية</summary>
+          <pre dir="ltr" id="alert-detail-text"></pre>
+        </details>
+      </section>
+
+      <section class="card result-card" id="result-card" hidden>
+        <div class="result-head">
+          <div class="tabs" role="tablist">
+            <button type="button" class="tab active" id="tab-flow" role="tab"
+                    aria-selected="true">نص متصل</button>
+            <button type="button" class="tab" id="tab-timed" role="tab"
+                    aria-selected="false">مع الطوابع الزمنية</button>
+          </div>
+          <div class="result-tools">
+            <button type="button" class="ghost" id="copy-btn">نسخ النص</button>
+            <a class="ghost dl" id="dl-txt" download>TXT</a>
+            <a class="ghost dl" id="dl-srt" download>SRT</a>
+            <a class="ghost dl" id="dl-vtt" download>VTT</a>
+          </div>
+        </div>
+
+        <div class="transcript" id="transcript-flow" lang="ar" dir="rtl"></div>
+        <ol class="transcript timed" id="transcript-timed" lang="ar" dir="rtl" hidden></ol>
+
+        <p class="result-meta" id="result-meta"></p>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        يعمل محلياً باستخدام
+        <span dir="ltr">faster-whisper</span>
+        — لا تُرسل أي بيانات إلى أي خدمة خارجية.
+      </p>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

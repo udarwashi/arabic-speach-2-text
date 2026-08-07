@@ -1,0 +1,6 @@
+# NVIDIA runtime libraries that CTranslate2 4.x needs for CUDA execution.
+# Install these on top of requirements.txt only if you have an NVIDIA GPU:
+#   pip install -r requirements-gpu.txt
+# Without them the app still works — it falls back to CPU automatically.
+nvidia-cublas-cu12==12.4.5.8
+nvidia-cudnn-cu12==9.1.1.17

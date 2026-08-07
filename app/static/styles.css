@@ -1,0 +1,675 @@
+/* Layout uses logical properties only (inline-start/end, margin-inline) so the
+   whole page mirrors correctly under dir="rtl" without any per-side overrides. */
+
+/* ---------- fonts ----------
+   Self-hosted (SIL Open Font License) so the page still renders correctly with
+   no network: IBM Plex Sans Arabic for the interface, Noto Naskh Arabic for the
+   transcript itself, where a naskh face is easier to read at length. */
+
+@font-face {
+  font-family: "Plex Arabic";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/static/fonts/ibm-plex-sans-arabic-400-arabic.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1,
+                 U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41,
+                 U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+@font-face {
+  font-family: "Plex Arabic";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/static/fonts/ibm-plex-sans-arabic-400-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Plex Arabic";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/static/fonts/ibm-plex-sans-arabic-500-arabic.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1,
+                 U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41,
+                 U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+@font-face {
+  font-family: "Plex Arabic";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/static/fonts/ibm-plex-sans-arabic-500-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Plex Arabic";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/static/fonts/ibm-plex-sans-arabic-600-arabic.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1,
+                 U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41,
+                 U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+@font-face {
+  font-family: "Plex Arabic";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/static/fonts/ibm-plex-sans-arabic-600-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Plex Arabic";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/static/fonts/ibm-plex-sans-arabic-700-arabic.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1,
+                 U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41,
+                 U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+@font-face {
+  font-family: "Plex Arabic";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/static/fonts/ibm-plex-sans-arabic-700-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Naskh Arabic";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/static/fonts/noto-naskh-arabic-400-arabic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Naskh Arabic";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/static/fonts/noto-naskh-arabic-600-arabic.woff2") format("woff2");
+}
+
+/* ---------- palette ---------- */
+
+:root {
+  --bg: #f0eee6;
+  --bg-glow: #e6e1d3;
+  --surface: #fdfcfa;
+  --surface-sunk: #f6f4ed;
+  --border: #e4e0d3;
+  --border-strong: #d5cfbd;
+  --text: #1a1915;
+  --muted: #6d6960;
+  --accent: #c15f3c;
+  --accent-strong: #a44b2c;
+  --accent-soft: #f7e9e2;
+  --accent-ink: #ffffff;
+  --danger: #a3252b;
+  --danger-soft: #fbeceb;
+  --shadow-sm: 0 1px 2px rgb(26 25 21 / 5%);
+  --shadow: 0 1px 2px rgb(26 25 21 / 4%), 0 12px 28px -12px rgb(26 25 21 / 14%);
+  --shadow-lift: 0 2px 4px rgb(26 25 21 / 5%), 0 18px 36px -14px rgb(26 25 21 / 20%);
+  --radius: 18px;
+  --radius-sm: 11px;
+  --font-ui: "Plex Arabic", "IBM Plex Sans Arabic", "Noto Sans Arabic",
+             "Segoe UI", system-ui, sans-serif;
+  --font-read: "Naskh Arabic", "Noto Naskh Arabic", "Amiri", "Plex Arabic", serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1a18;
+    --bg-glow: #23211d;
+    --surface: #262523;
+    --surface-sunk: #201f1d;
+    --border: #383630;
+    --border-strong: #4a4740;
+    --text: #f0eee6;
+    --muted: #a29d92;
+    --accent: #e08a6a;
+    --accent-strong: #f0a184;
+    --accent-soft: #35251e;
+    --accent-ink: #1b1a18;
+    --danger: #f0a09c;
+    --danger-soft: #341d1d;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 30%);
+    --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 12px 28px -12px rgb(0 0 0 / 60%);
+    --shadow-lift: 0 2px 4px rgb(0 0 0 / 35%), 0 18px 36px -14px rgb(0 0 0 / 70%);
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* Several components below set a display value, which would otherwise win over
+   the user-agent rule for [hidden] and leave them on screen. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  /* A single warm glow behind the masthead keeps the page from reading flat. */
+  background-image: radial-gradient(120% 60% at 50% -10%, var(--bg-glow), transparent 70%);
+  background-repeat: no-repeat;
+  color: var(--text);
+  font-family: var(--font-ui);
+  /* Arabic needs more leading than Latin to stay legible. */
+  line-height: 1.85;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 56rem;
+  margin-inline: auto;
+  padding: 2.5rem 1.25rem 3.5rem;
+}
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-block-end: 2rem;
+}
+
+.brand { display: flex; align-items: center; gap: 0.9rem; }
+
+.logo { flex: none; display: block; width: 2.75rem; height: 2.75rem; }
+.logo svg { width: 100%; height: 100%; display: block; filter: drop-shadow(var(--shadow-sm)); }
+.logo-plate { fill: var(--accent); }
+.logo-wave { stroke: var(--accent-ink); }
+.logo-text { stroke: var(--accent-ink); opacity: 0.75; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.45rem, 1.15rem + 1.5vw, 2rem);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.sub {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.badge::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.badge.gpu {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: var(--accent-soft);
+}
+.badge.gpu::before { opacity: 1; }
+
+/* ---------- cards ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.4rem;
+  margin-block-end: 1.1rem;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-block: 1.5rem 0.7rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* The hairline that trails a section title, drawn with a logical-flow gradient. */
+.section-head::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ---------- dropzone ---------- */
+
+.dropzone {
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-sunk);
+  padding: 2.25rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease,
+              transform 140ms ease, box-shadow 140ms ease;
+}
+
+.dropzone:hover,
+.dropzone:focus-visible,
+.dropzone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: var(--shadow-sm);
+  outline: none;
+}
+
+.dropzone.dragover { transform: translateY(-1px); }
+
+.dz-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  margin-block-end: 0.6rem;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.dz-icon { width: 1.5rem; height: 1.5rem; }
+.dz-title { margin: 0.2rem 0 0.25rem; font-size: 1.02rem; font-weight: 500; }
+.dz-hint { margin: 0; color: var(--muted); font-size: 0.83rem; }
+
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-block-start: 0.9rem;
+  padding: 0.6rem 0.85rem;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: var(--radius-sm);
+  font-size: 0.92rem;
+}
+
+.chip-icon { flex: none; width: 1.15rem; height: 1.15rem; color: var(--accent); }
+.file-name { flex: 1 1 auto; overflow-wrap: anywhere; }
+.file-size { color: var(--muted); font-size: 0.84rem; unicode-bidi: isolate; }
+
+.chip-clear {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0 0.2rem;
+  line-height: 1;
+}
+.chip-clear:hover { color: var(--danger); }
+
+/* ---------- model picker ---------- */
+
+.model-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+  gap: 0.6rem;
+}
+
+.model-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunk);
+  padding: 0.85rem 0.95rem;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease,
+              box-shadow 140ms ease;
+}
+
+.model-card:hover { border-color: var(--border-strong); }
+
+/* The radio itself is invisible but still focusable and announced. */
+.model-card input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.model-card:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.model-card:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.model-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.97rem;
+  line-height: 1.5;
+}
+
+/* A checkmark that only exists for the chosen card. */
+.model-card:has(input:checked) .model-name::before {
+  content: "✓";
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.model-note {
+  display: block;
+  margin-block: 0.15rem 0.5rem;
+  color: var(--muted);
+  font-size: 0.83rem;
+  line-height: 1.6;
+}
+
+/* Pushed to the bottom so the size chips line up across cards of unequal text. */
+.model-size {
+  align-self: start;
+  margin-block-start: auto;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.7;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* ---------- controls ---------- */
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.85rem;
+  margin-block-start: 1.5rem;
+}
+
+.field { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; }
+.field > span:first-child { color: var(--muted); }
+
+.select-wrap { position: relative; display: block; }
+
+select {
+  font: inherit;
+  font-size: 0.95rem;
+  width: 100%;
+  color: var(--text);
+  background: var(--surface-sunk);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding-block: 0.55rem;
+  padding-inline: 0.7rem 2.1rem;
+  text-align: start;
+  cursor: pointer;
+  appearance: none;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+select:hover { border-color: var(--border-strong); }
+select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.select-arrow {
+  position: absolute;
+  inset-inline-end: 0.7rem;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.actions { display: flex; gap: 0.6rem; margin-block-start: 1.5rem; }
+
+button, .dl {
+  font: inherit;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: 1px solid transparent;
+  padding: 0.6rem 1.3rem;
+  transition: background-color 140ms ease, border-color 140ms ease,
+              color 140ms ease, opacity 140ms ease, transform 140ms ease;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+.primary:hover:not(:disabled) { background: var(--accent-strong); }
+.primary:active:not(:disabled) { transform: translateY(1px); }
+.primary:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+.ghost {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+  text-decoration: none;
+  display: inline-block;
+  font-size: 0.88rem;
+  padding: 0.45rem 0.95rem;
+}
+.ghost:hover { border-color: var(--accent); color: var(--accent); }
+.ghost[aria-disabled="true"] { opacity: 0.4; pointer-events: none; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- status ---------- */
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-block-end: 0.7rem;
+}
+
+.status-label { font-size: 0.97rem; font-weight: 500; }
+.status-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: isolate;
+}
+
+.progress {
+  height: 7px;
+  background: var(--surface-sunk);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  border-radius: 999px;
+  transition: width 240ms ease;
+}
+
+.progress.indeterminate .progress-fill {
+  width: 35%;
+  /* In RTL the animation must travel the other way, hence the logical keyframes. */
+  animation: sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  0%   { margin-inline-start: 0; }
+  50%  { margin-inline-start: 65%; }
+  100% { margin-inline-start: 0; }
+}
+
+/* ---------- alert ---------- */
+
+.alert {
+  background: var(--danger-soft);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  margin-block-end: 1.1rem;
+}
+.alert p { margin: 0.3rem 0 0; }
+.alert summary { cursor: pointer; font-size: 0.85rem; margin-block-start: 0.4rem; }
+.alert pre {
+  margin: 0.5rem 0 0;
+  padding: 0.6rem;
+  /* Tinted from the text colour so it darkens in light mode and lightens in dark. */
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
+/* ---------- result ---------- */
+
+.result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-block-end: 1.1rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  background: var(--surface-sunk);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.tab {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  padding: 0.3rem 0.9rem;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.result-tools { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.transcript {
+  font-family: var(--font-read);
+  font-size: 1.18rem;
+  line-height: 2.15;
+  text-align: start;
+  overflow-wrap: break-word;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-inline-end: 0.4rem;
+}
+
+.transcript:empty::before {
+  content: "…";
+  color: var(--muted);
+}
+
+ol.timed { list-style: none; margin: 0; padding: 0; }
+
+ol.timed li {
+  display: flex;
+  gap: 0.85rem;
+  padding-block: 0.5rem;
+  border-block-end: 1px solid var(--border);
+}
+ol.timed li:last-child { border-block-end: none; }
+
+/* Timestamps are Latin digits inside Arabic text: without direction isolation the
+   bidi algorithm reorders "00:01:23" against the surrounding run. */
+.ts {
+  flex: none;
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding-block-start: 0.5rem;
+  min-width: 7ch;
+}
+
+ol.timed .seg-text { flex: 1 1 auto; }
+
+li.fresh { animation: fade-in 400ms ease; }
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.result-meta {
+  margin: 1.1rem 0 0;
+  padding-block-start: 0.85rem;
+  border-block-start: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.83rem;
+  line-height: 1.9;
+}
+
+footer {
+  margin-block-start: 2.5rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

@@ -167,7 +167,7 @@ def main() -> int:
     try:
         log.info("starting from %s, data in %s", bundle_dir(), root)
 
-        from app.cuda_setup import cuda_runtime_available, ensure_cuda
+        from app.cuda_setup import cuda_runtime_available, ensure_cuda, say
 
         on_gpu = ensure_cuda(root / "cuda", logger=log)
         log.info("CUDA runtime %s", "ready" if on_gpu else "not provisioned")
@@ -196,7 +196,7 @@ def main() -> int:
             print("تعذّر تشغيل الخادم. راجع ملف السجل:", root / "logs")
             return _hold(1)
 
-        print(_BANNER.format(url=url), flush=True)
+        say(_BANNER.format(url=url))
         threading.Event().wait()
         return 0
     except KeyboardInterrupt:

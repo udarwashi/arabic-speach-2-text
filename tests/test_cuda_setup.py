@@ -354,3 +354,43 @@ def test_register_does_not_duplicate_the_path_entry(monkeypatch, tmp_path: Path)
 
     cuda_setup._register(tmp_path, None)
     assert cuda_setup.os.environ["PATH"].count(str(tmp_path)) == 1
+
+
+# -- console safety ---------------------------------------------------------
+
+
+class _LegacyConsole:
+    """A stdout that behaves like a cp1252 Windows console."""
+
+    encoding = "cp1252"
+
+    def __init__(self) -> None:
+        self.written: list[str] = []
+
+    def write(self, text: str) -> int:
+        text.encode("cp1252")  # raises on Arabic, exactly as the real one does
+        self.written.append(text)
+        return len(text)
+
+    def flush(self) -> None:
+        pass
+
+
+def test_say_survives_a_console_that_cannot_encode_arabic(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(cuda_setup.sys, "stdout", _LegacyConsole())
+    cuda_setup.say("تم العثور على كرت رسوميات NVIDIA")  # must not raise
+
+
+def test_arabic_notice_cannot_abort_the_download(monkeypatch, tmp_path: Path) -> None:
+    """A cosmetic message must never cost the user their GPU."""
+    _pretend_windows(monkeypatch, driver=True)
+    monkeypatch.setattr(cuda_setup.sys, "stdout", _LegacyConsole())
+
+    fetched: list[str] = []
+    monkeypatch.setattr(
+        cuda_setup, "_fetch", lambda wheel, dest, log: fetched.append(wheel.name) or True
+    )
+    monkeypatch.setattr(cuda_setup, "_register", lambda path, log: True)
+
+    assert cuda_setup.ensure_cuda(tmp_path / "cuda") is True
+    assert len(fetched) == len(cuda_setup.WHEELS)

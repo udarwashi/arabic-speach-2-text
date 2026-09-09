@@ -29,6 +29,7 @@ from urllib.request import Request, urlopen
 
 __all__ = [
     "ensure_cuda",
+    "say",
     "has_nvidia_driver",
     "cuda_runtime_available",
     "WHEELS",
@@ -91,6 +92,27 @@ def marker_text() -> str:
     return " ".join(f"{wheel.name.split('-')[0]}={wheel.version}" for wheel in WHEELS)
 
 
+def say(message: str) -> None:
+    """Print a status line without letting the console's encoding break anything.
+
+    The Windows console defaults to a legacy code page that cannot represent
+    Arabic, and an unguarded ``print`` there raises ``UnicodeEncodeError``. That
+    once aborted the whole CUDA download over a cosmetic message, quietly costing
+    the user their GPU, so every console write in this module goes through here.
+    """
+    try:
+        print(message, flush=True)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stdout, "encoding", None) or "ascii"
+        try:
+            print(message.encode(encoding, "replace").decode(encoding, "replace"),
+                  flush=True)
+        except (UnicodeError, OSError):
+            pass
+    except OSError:
+        pass
+
+
 def has_nvidia_driver() -> bool:
     """True when the NVIDIA display driver is installed.
 
@@ -138,10 +160,9 @@ def _ensure_cuda(target: Path, log: logging.Logger) -> bool:
         "NVIDIA driver found. Downloading the CUDA runtime once (~1.1 GB) into %s",
         target,
     )
-    print(
+    say(
         "\nتم العثور على كرت رسوميات NVIDIA — يجري تنزيل مكتبات التسريع مرة واحدة"
-        " (حوالي 1.1 غيغابايت). لن يتكرر هذا في المرات القادمة.\n",
-        flush=True,
+        " (حوالي 1.1 غيغابايت). لن يتكرر هذا في المرات القادمة.\n"
     )
 
     target.mkdir(parents=True, exist_ok=True)
@@ -328,13 +349,16 @@ def _stream(
             handle.write(chunk)
             done += len(chunk)
             if total:
-                print(
-                    f"\r  {done / 1e6:,.0f} / {total / 1e6:,.0f} MB"
-                    f"  ({done * 100 // total}%)",
-                    end="",
-                    flush=True,
-                )
-    print(flush=True)
+                try:
+                    print(
+                        f"\r  {done / 1e6:,.0f} / {total / 1e6:,.0f} MB"
+                        f"  ({done * 100 // total}%)",
+                        end="",
+                        flush=True,
+                    )
+                except OSError:
+                    pass
+    say("")
     return True
 
 

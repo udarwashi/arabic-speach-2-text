@@ -218,6 +218,8 @@ Built on 2026-09-09 with Windows Python 3.11.6, PyInstaller 6.22.2 and Inno Setu
 | Silent install | exit 0, no UAC prompt, per-user under `%LOCALAPPDATA%\Programs\speech2text` |
 | Start Menu entry | `تحويل الصوت إلى نص.lnk`, correct Arabic |
 | CUDA bundled | none — confirmed absent from `_internal\` |
+| CUDA provisioned on first run | 11 DLLs, 1.5 GB, both wheels passed their checksums |
+| Transcription | verified on both `cuda`/`float16` and `cpu`/`int8`, identical output |
 
 ## Known rough edges
 

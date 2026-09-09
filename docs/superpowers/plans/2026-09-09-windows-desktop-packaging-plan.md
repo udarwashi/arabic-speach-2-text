@@ -155,7 +155,10 @@ Verified against the built exe, not just the source:
 | Transcript | *"Hello. This is a test of the offline speech-to-text application. It converts audio files into written text."* — verbatim |
 | Exports | TXT 200, SRT 200, VTT 200, timestamps correct |
 | GPU detection | `nvcuda.dll` found, download triggered |
-| Download resume | interrupted at 187 MB, resumed from 187 MB, not 0 |
+| Download resume | interrupted at 187 MB and again at 331 MB, resumed each time |
+| CUDA provisioning | 11 DLLs extracted (8 cuDNN, 3 cuBLAS), 1.5 GB, both checksums passed |
+| Transcription (GPU) | `device=cuda compute=float16`, transcript identical to the CPU run |
+| Second launch | `CUDA runtime already present`, nothing re-downloaded |
 
 Three defects were found by running the built exe rather than the tests, each fixed and
 covered by a regression test:
@@ -168,5 +171,7 @@ covered by a regression test:
 3. `print()` of the Arabic notice raised `UnicodeEncodeError` on a cp1252 console and
    aborted the whole CUDA download. Console writes now go through `say()`.
 
-Still outstanding: the GPU transcription run, waiting on the ~1.1 GB CUDA download, which
-this network serves at roughly 0.5 MB/s.
+The one thing left untested is the uninstaller's offer to delete the cached models and
+GPU libraries. The uninstall entry is registered and the standard Inno machinery is
+exercised; only that custom prompt is unverified, because confirming it costs the 1.5 GB
+cache and the download runs at roughly 0.5 MB/s here.

@@ -49,10 +49,13 @@ Name: "{autodesktop}\{#AppNameAr}"; Filename: "{app}\{#AppExe}"; Tasks: desktopi
 Filename: "{app}\{#AppExe}"; Description: "Start now / تشغيل البرنامج الآن"; Flags: nowait postinstall skipifsilent
 
 [Code]
-{ The model weights and the CUDA runtime live outside {app}, in
-  %LOCALAPPDATA%\speech2text, and are several gigabytes. Re-downloading them
-  after an accidental uninstall is worse than leaving a cache behind, so they
-  are kept unless the user explicitly asks otherwise. }
+// The model weights and the CUDA runtime live outside the program directory,
+// in %LOCALAPPDATA%\speech2text, and are several gigabytes. Re-downloading them
+// after an accidental uninstall is worse than leaving a cache behind, so they
+// are kept unless the user explicitly asks otherwise.
+//
+// Note: Pascal block comments end at the first closing brace, so a brace-quoted
+// comment must never mention an Inno constant such as the app directory one.
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   DataDir: String;

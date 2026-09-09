@@ -29,6 +29,10 @@ import webbrowser
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+# Safe to import this early: it touches only the standard library and reads the
+# environment when called, not when imported.
+from app.cuda_setup import cuda_runtime_available, ensure_cuda, say
+
 APP_DIR_NAME = "speech2text"
 HOST = "127.0.0.1"
 _READY_TIMEOUT = 60.0
@@ -167,8 +171,6 @@ def main() -> int:
     try:
         log.info("starting from %s, data in %s", bundle_dir(), root)
 
-        from app.cuda_setup import cuda_runtime_available, ensure_cuda, say
-
         on_gpu = ensure_cuda(root / "cuda", logger=log)
         log.info("CUDA runtime %s", "ready" if on_gpu else "not provisioned")
 
@@ -193,7 +195,7 @@ def main() -> int:
                 log.warning("could not open a browser; the URL is %s", url)
         else:
             log.error("the server did not start within %.0f seconds", _READY_TIMEOUT)
-            print("تعذّر تشغيل الخادم. راجع ملف السجل:", root / "logs")
+            say(f"تعذّر تشغيل الخادم. راجع ملف السجل: {root / 'logs'}")
             return _hold(1)
 
         say(_BANNER.format(url=url))
@@ -204,15 +206,21 @@ def main() -> int:
         return 0
     except Exception:  # noqa: BLE001 - show the user something, never vanish
         log.exception("the application failed to start")
-        print("\nحدث خطأ أثناء تشغيل البرنامج. التفاصيل في:", root / "logs", flush=True)
+        say(f"\nحدث خطأ أثناء تشغيل البرنامج. التفاصيل في: {root / 'logs'}")
         return _hold(1)
 
 
 def _hold(code: int) -> int:
-    """Keep the console open so an error is readable after a double-click."""
+    """Keep the console open so an error is readable after a double-click.
+
+    The prompt goes through ``say`` first: ``input`` writes its prompt to stdout,
+    and an encoding error there would replace the message the user needs with a
+    traceback, in the one situation where something has already gone wrong.
+    """
+    say("\nاضغط Enter للإغلاق / press Enter to close ")
     try:
-        input("\nاضغط Enter للإغلاق / press Enter to close ")
-    except (EOFError, KeyboardInterrupt):
+        input()
+    except (EOFError, KeyboardInterrupt, OSError):
         pass
     return code
 

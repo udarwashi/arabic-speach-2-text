@@ -137,3 +137,36 @@ T3/T4/T6 are independent of each other and can be written in one pass.
 ## Out of scope
 
 Code signing, auto-update, macOS/Linux builds, tray icon, `pywebview` window.
+
+
+## Outcome
+
+Built and verified on 2026-09-09. `dist/speech2text-setup.exe`, 115 MB, from a 435 MB
+onedir bundle.
+
+Verified against the built exe, not just the source:
+
+| Check | Result |
+| --- | --- |
+| Silent install | exit 0, no UAC, per-user; Start Menu entry `تحويل الصوت إلى نص.lnk` |
+| Bundle contents | `bin/ffmpeg.exe` + `ffprobe.exe`, Silero VAD `.onnx`, `app/static/**`; **no** cuDNN/cuBLAS |
+| Launch | server up in ~1 s, free port, browser opened, `GET / → 200`, `auth: false` |
+| Transcription (CPU) | real speech, `status: done`, 2 segments, `device=cpu compute=int8 lang=en` |
+| Transcript | *"Hello. This is a test of the offline speech-to-text application. It converts audio files into written text."* — verbatim |
+| Exports | TXT 200, SRT 200, VTT 200, timestamps correct |
+| GPU detection | `nvcuda.dll` found, download triggered |
+| Download resume | interrupted at 187 MB, resumed from 187 MB, not 0 |
+
+Three defects were found by running the built exe rather than the tests, each fixed and
+covered by a regression test:
+
+1. The packaged app redirected to a login page, because `config.load_dotenv` read the
+   developer's own `.env`. The launcher now sets `S2T_PASSWORD` explicitly.
+2. Real speech failed with `Library cublas64_12.dll is not found or cannot be loaded`.
+   `transcriber.py`'s CUDA-to-CPU fallback covers model loading only, and this fails during
+   decoding. The launcher now pins `S2T_DEVICE=cpu` when the CUDA libraries will not load.
+3. `print()` of the Arabic notice raised `UnicodeEncodeError` on a cp1252 console and
+   aborted the whole CUDA download. Console writes now go through `say()`.
+
+Still outstanding: the GPU transcription run, waiting on the ~1.1 GB CUDA download, which
+this network serves at roughly 0.5 MB/s.

@@ -172,17 +172,19 @@ def main() -> int:
     try:
         log.info("starting from %s, data in %s", bundle_dir(), root)
 
-        from app.cuda_setup import ensure_cuda
+        from app.cuda_setup import cuda_runtime_available, ensure_cuda
 
         on_gpu = ensure_cuda(root / "cuda", logger=log)
-        log.info("CUDA runtime %s", "ready" if on_gpu else "not in use")
+        log.info("CUDA runtime %s", "ready" if on_gpu else "not provisioned")
 
-        # Without the cuDNN DLLs, CTranslate2 still reports a CUDA device -- it
-        # sees the card through the driver -- so resolve_device() would pick
-        # "cuda" and only reach the CPU by way of a failed model load. When the
-        # runtime was deliberately skipped, say so up front instead.
-        if not on_gpu and _cuda_skipped():
+        # CTranslate2 reports a CUDA device whenever the driver can see the card,
+        # whether or not cuBLAS is present, so resolve_device() would pick "cuda"
+        # and then fail -- during decoding, where transcriber.py's fallback does
+        # not reach, leaving the user with an error instead of a slower answer.
+        # Decide it here, from whether the libraries can actually be loaded.
+        if not cuda_runtime_available():
             os.environ.setdefault("S2T_DEVICE", "cpu")
+            log.info("CUDA libraries are not loadable; using the CPU")
 
         port = free_port()
         url = f"http://{HOST}:{port}/"

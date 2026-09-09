@@ -27,7 +27,13 @@ from typing import IO
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-__all__ = ["ensure_cuda", "has_nvidia_driver", "WHEELS", "MARKER"]
+__all__ = [
+    "ensure_cuda",
+    "has_nvidia_driver",
+    "cuda_runtime_available",
+    "WHEELS",
+    "MARKER",
+]
 
 _LOG = logging.getLogger(__name__)
 
@@ -37,6 +43,9 @@ MARKER = ".complete"
 
 _CHUNK = 1 << 20  # 1 MiB
 _DLL_PARENTS = ("bin",)  # inside a wheel the Windows DLLs live in nvidia/<lib>/bin/
+
+# What CTranslate2 opens by name before it will run anything on the GPU.
+_REQUIRED_DLLS = ("cublas64_12.dll", "cudnn64_9.dll")
 
 
 @dataclass(frozen=True)
@@ -155,10 +164,13 @@ def _is_complete(target: Path) -> bool:
 
 
 def _register(target: Path, log: logging.Logger | None) -> bool:
-    """Put ``target`` on the DLL search path.
+    """Make the DLLs in ``target`` loadable, by both mechanisms that matter.
 
-    Since Python 3.8 extension modules no longer search ``PATH`` for their
-    dependent DLLs, so this — not a ``PATH`` edit — is what makes cuDNN loadable.
+    ``os.add_dll_directory`` covers dependent-DLL resolution, which since Python
+    3.8 no longer consults ``PATH``. But CTranslate2 opens the CUDA libraries by
+    name at run time rather than importing them, and a plain ``LoadLibrary`` does
+    still search ``PATH`` while ignoring the directories added that way. Doing
+    both costs nothing and covers either code path.
     """
     add = getattr(os, "add_dll_directory", None)
     if add is None:  # not Windows; nothing to do and nothing that could use it
@@ -169,6 +181,30 @@ def _register(target: Path, log: logging.Logger | None) -> bool:
         if log:
             log.warning("could not register %s on the DLL search path", target)
         return False
+
+    if str(target) not in os.environ.get("PATH", "").split(os.pathsep):
+        os.environ["PATH"] = f"{target}{os.pathsep}{os.environ.get('PATH', '')}"
+    return True
+
+
+def cuda_runtime_available() -> bool:
+    """True when the libraries CTranslate2 needs for CUDA can actually load.
+
+    Checked after provisioning, because the answer decides whether the GPU is
+    usable at all. ``transcriber`` only falls back to the CPU when *loading* a
+    model raises; this failure surfaces later, during decoding, where nothing
+    catches it — so the choice has to be made up front.
+
+    Off Windows the CUDA libraries come from pip alongside CTranslate2 and are
+    not this module's business, so the answer is always yes.
+    """
+    if sys.platform != "win32":
+        return True
+    for name in _REQUIRED_DLLS:
+        try:
+            ctypes.WinDLL(name)
+        except OSError:
+            return False
     return True
 
 

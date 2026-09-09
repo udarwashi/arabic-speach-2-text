@@ -307,3 +307,50 @@ def test_pinned_wheels_match_requirements_gpu() -> None:
         assert len(wheel.sha256) == 64
         assert wheel.url.startswith("https://files.pythonhosted.org/")
         assert wheel.name.endswith("win_amd64.whl")
+
+
+# -- is the runtime actually usable? ---------------------------------------
+
+
+def test_runtime_always_available_off_windows(monkeypatch) -> None:
+    """Elsewhere the CUDA libraries arrive with CTranslate2, via pip."""
+    monkeypatch.setattr(cuda_setup.sys, "platform", "linux")
+    assert cuda_setup.cuda_runtime_available() is True
+
+
+def test_runtime_available_when_every_dll_loads(monkeypatch) -> None:
+    monkeypatch.setattr(cuda_setup.sys, "platform", "win32")
+    monkeypatch.setattr(ctypes, "WinDLL", lambda name: object(), raising=False)
+    assert cuda_setup.cuda_runtime_available() is True
+
+
+def test_runtime_unavailable_when_cublas_is_missing(monkeypatch) -> None:
+    """The exact failure seen in the packaged build before this check existed."""
+    monkeypatch.setattr(cuda_setup.sys, "platform", "win32")
+
+    def win_dll(name: str):
+        if name == "cublas64_12.dll":
+            raise OSError("not found")
+        return object()
+
+    monkeypatch.setattr(ctypes, "WinDLL", win_dll, raising=False)
+    assert cuda_setup.cuda_runtime_available() is False
+
+
+def test_register_also_puts_the_directory_on_path(monkeypatch, tmp_path: Path) -> None:
+    """CTranslate2 opens the CUDA libraries by name, and that search reads PATH."""
+    added: list[str] = []
+    monkeypatch.setattr(os := cuda_setup.os, "add_dll_directory", added.append, raising=False)
+    monkeypatch.setenv("PATH", "/usr/bin")
+
+    assert cuda_setup._register(tmp_path, None) is True
+    assert added == [str(tmp_path)]
+    assert os.environ["PATH"].split(os.pathsep)[0] == str(tmp_path)
+
+
+def test_register_does_not_duplicate_the_path_entry(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(cuda_setup.os, "add_dll_directory", lambda p: None, raising=False)
+    monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin")
+
+    cuda_setup._register(tmp_path, None)
+    assert cuda_setup.os.environ["PATH"].count(str(tmp_path)) == 1

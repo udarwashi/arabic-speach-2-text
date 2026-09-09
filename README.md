@@ -170,6 +170,56 @@ one decode runs at a time — a 4 GB GPU cannot hold two large models.
   subtitle players and text editors align them correctly even when a line starts with a
   digit or a Latin word.
 
+## Windows desktop build
+
+For handing the app to someone who has no Python, no ffmpeg and no intention of opening a
+terminal. The result is one `speech2text-setup.exe`: they double-click it, and afterwards a
+Start Menu entry starts the server on a free localhost port and opens their browser at it.
+Nothing is hosted anywhere — the model runs on their machine, as it does here.
+
+```powershell
+# On Windows (PyInstaller cannot cross-compile), from a native path -- not \\wsl.localhost\...
+winget install JRSoftware.InnoSetup
+.\packaging\build.ps1          # -SkipInstaller to stop after PyInstaller
+# -> dist\speech2text-setup.exe
+```
+
+`build.ps1` creates its own `.venv-win`, fetches a static ffmpeg build into `packaging/bin/`,
+runs PyInstaller over `packaging/speech2text.spec`, and wraps the result with Inno Setup. It
+installs `requirements.txt` only: `requirements-gpu.txt` would add ~1.5 GB of CUDA libraries
+to the bundle, which is exactly what the on-demand download below avoids.
+
+### What the packaged app does differently
+
+Nothing in `app/` changes. `app/launcher.py` arranges the process before anything else loads:
+
+| Problem when frozen | What the launcher does |
+| --- | --- |
+| `PROJECT_ROOT` is a temp directory, so the 1.6 GB model would be re-downloaded every launch | Sets `S2T_MODEL_DIR`/`S2T_WORK_DIR` to `%LOCALAPPDATA%\speech2text` **before** the `lru_cache`d `get_settings()` runs |
+| The user has no ffmpeg | Prepends the bundled `bin/` to `PATH`, where `audio.py` already looks |
+| A fixed port may be taken | Binds `127.0.0.1:0` and lets the OS choose |
+| No terminal to read errors in | Rotating log at `%LOCALAPPDATA%\speech2text\logs\` |
+| No obvious way to quit | The console window is the quit button, labelled in Arabic |
+
+The password gate is off in this build: no `.env` ships, so `S2T_PASSWORD` is empty and
+`auth.py` leaves every route open. It guards a server bound to the user's own loopback.
+
+### GPU without a 2 GB installer
+
+CTranslate2 needs cuDNN and cuBLAS, ~1.5 GB installed, for the fast path. Bundling them
+would burden every user with a GPU-only payload, so `app/cuda_setup.py` fetches them on
+first run and only when `nvcuda.dll` loads — a DLL the NVIDIA driver installs and nothing
+else does. The two wheels are pinned to the versions in `requirements-gpu.txt` and verified
+by SHA-256 before they are opened; the DLLs are registered with `os.add_dll_directory`,
+which is what Windows needs since Python 3.8 stopped searching `PATH` for dependent DLLs.
+
+No card, no network, or a bad checksum: it logs and returns, and `transcriber.resolve_device`
+reports `cpu` by itself. `S2T_SKIP_CUDA=1` forces the CPU path for testing.
+
+New to desktop packaging? `docs/desktop-app-primer.md` covers the background — what an `.exe`
+is, how PyInstaller's analysis works, `sys._MEIPASS`, DLL search order, installers and code
+signing.
+
 ## Project layout
 
 ```
@@ -182,10 +232,13 @@ app/
   formats.py      segments → TXT / SRT / VTT
   auth.py         password check, session cookies, lockout counters
   main.py         routes + the password gate
+  launcher.py     desktop entry point: paths, PATH, port, browser, console
+  cuda_setup.py   on-demand cuDNN/cuBLAS download for the packaged build
   static/         index.html, login.html, styles.css, app.js, login.js (no build step)
   static/fonts/   vendored IBM Plex Sans Arabic + Noto Naskh Arabic (OFL)
+packaging/        PyInstaller spec, Inno Setup script, build.ps1
 tests/            pytest suite
-docs/superpowers/specs/   design document
+docs/             desktop-app-primer.md, superpowers/specs, superpowers/plans
 ```
 
 ## Tests

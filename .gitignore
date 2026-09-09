@@ -8,3 +8,8 @@ work/
 *.wav
 *.srt
 *.vtt
+
+packaging/bin/
+build/
+dist/
+.venv-win/

@@ -97,9 +97,27 @@ ensure_cuda() -> bool          # True if the CUDA DLL directory is registered
   RTX 3050. Download progress is printed to the console; a partial download is written to
   a `.part` file and renamed only on a hash match, so an interrupted first run retries
   cleanly rather than caching corruption.
-- **Registration** calls `os.add_dll_directory()` on the cache directory. This, not `PATH`,
-  is required: since Python 3.8 extension modules no longer search `PATH` for dependent
-  DLLs.
+- **Registration** calls `os.add_dll_directory()` on the cache directory *and* prepends it
+  to `PATH`. Both are needed: since Python 3.8 extension modules no longer search `PATH`
+  for their dependent DLLs, but CTranslate2 opens the CUDA libraries by name at run time,
+  and a plain `LoadLibrary` searches `PATH` while ignoring directories added the other way.
+- **`cuda_runtime_available()`** then tries to load `cublas64_12.dll` and `cudnn64_9.dll`,
+  and the launcher pins `S2T_DEVICE=cpu` when they will not load. This is not belt and
+  braces; it closes a real gap found by running real speech through the packaged build:
+
+  > `RuntimeError: Library cublas64_12.dll is not found or cannot be loaded`
+
+  CTranslate2 reports a CUDA device whenever the *driver* can see the card, so
+  `resolve_device()` picks `cuda` even with no cuBLAS present. The existing fallback in
+  `transcriber.py:146-168` wraps only model *loading*; this failure happens later, during
+  decoding, where nothing catches it. A user whose CUDA download had failed would have got
+  an error rather than a slower answer.
+- **Downloads resume.** A `Range` request continues an interrupted `.part` file rather than
+  restarting 1.1 GB. The pinned SHA-256 still covers the whole file, so a stale or corrupt
+  partial simply fails the check and is discarded.
+- **Console writes go through `say()`.** The Windows console defaults to a code page that
+  cannot encode Arabic, and an unguarded `print` there raises `UnicodeEncodeError` —
+  which once aborted the entire download over a cosmetic message.
 - **Failure is never fatal.** No driver, no network, a hash mismatch, or a read-only disk
   all log a warning and return `False`. `transcriber.resolve_device()` then reports `cpu`
   on its own.
@@ -162,7 +180,9 @@ a cache behind; the installer offers removing it as an unchecked option.
 | --- | --- |
 | No NVIDIA driver | Skip CUDA silently, run on CPU |
 | CUDA download fails or hash mismatch | Log, delete the partial file, run on CPU |
+| CUDA runtime not loadable | `S2T_DEVICE=cpu` pinned before the server starts |
 | CUDA present but model load fails | Existing fallback in `transcriber.py:146-168` retries on CPU |
+| Console cannot encode Arabic | `say()` degrades to the console's own encoding; never raises |
 | Port unavailable | Cannot happen — the OS assigns the port |
 | Browser fails to open | The console prints the URL for manual entry |
 | Any startup exception | Logged to `logs\speech2text.log`, printed, console held open so the message is readable |

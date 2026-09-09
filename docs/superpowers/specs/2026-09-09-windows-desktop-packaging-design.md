@@ -104,7 +104,9 @@ ensure_cuda() -> bool          # True if the CUDA DLL directory is registered
   all log a warning and return `False`. `transcriber.resolve_device()` then reports `cpu`
   on its own.
 - **Escape hatch:** `S2T_SKIP_CUDA=1` skips the whole path, for testing the CPU route on a
-  GPU machine.
+  GPU machine. The launcher also pins `S2T_DEVICE=cpu` in that case: CTranslate2 still
+  reports a CUDA device without the cuDNN DLLs, because it sees the card through the
+  driver, so otherwise the flag would only reach the CPU by way of a failed model load.
 
 ### Why no transcription logic changes
 

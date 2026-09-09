@@ -146,6 +146,11 @@ def _use_utf8_console() -> None:
                 pass
 
 
+def _cuda_skipped() -> bool:
+    """True when S2T_SKIP_CUDA asks for the CPU path explicitly."""
+    return os.environ.get("S2T_SKIP_CUDA", "").strip() not in ("", "0")
+
+
 def _serve(port: int) -> threading.Thread:
     """Run uvicorn on a daemon thread. Imported late, after the environment is set."""
     import uvicorn
@@ -171,6 +176,13 @@ def main() -> int:
 
         on_gpu = ensure_cuda(root / "cuda", logger=log)
         log.info("CUDA runtime %s", "ready" if on_gpu else "not in use")
+
+        # Without the cuDNN DLLs, CTranslate2 still reports a CUDA device -- it
+        # sees the card through the driver -- so resolve_device() would pick
+        # "cuda" and only reach the CPU by way of a failed model load. When the
+        # runtime was deliberately skipped, say so up front instead.
+        if not on_gpu and _cuda_skipped():
+            os.environ.setdefault("S2T_DEVICE", "cpu")
 
         port = free_port()
         url = f"http://{HOST}:{port}/"

@@ -124,7 +124,7 @@ Add `packaging/bin/`, `build/`, `dist/`, `.venv-win/`.
 3. On this GPU box, `logs/speech2text.log` records the CUDA download then `device=cuda`.
 4. Transcribe a real MP3 end to end; export TXT, SRT, VTT.
 5. Close, relaunch: starts in ~2 s, downloads nothing.
-6. `S2T_SKIP_CUDA=1`: log records `device=cpu`, transcription still completes.
+6. `S2T_SKIP_CUDA=1`: the launcher pins `S2T_DEVICE=cpu`, the log records `device=cpu`, and transcription still completes.
 7. Uninstall leaves `%LOCALAPPDATA%\speech2text` unless the option was ticked.
 
 **Verify:** all seven observed; record results in the final report.

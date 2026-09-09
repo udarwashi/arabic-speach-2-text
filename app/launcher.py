@@ -146,11 +146,6 @@ def _use_utf8_console() -> None:
                 pass
 
 
-def _cuda_skipped() -> bool:
-    """True when S2T_SKIP_CUDA asks for the CPU path explicitly."""
-    return os.environ.get("S2T_SKIP_CUDA", "").strip() not in ("", "0")
-
-
 def _serve(port: int) -> threading.Thread:
     """Run uvicorn on a daemon thread. Imported late, after the environment is set."""
     import uvicorn

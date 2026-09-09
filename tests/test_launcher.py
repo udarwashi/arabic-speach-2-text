@@ -168,16 +168,3 @@ def test_wait_until_ready_gives_up_on_a_dead_port() -> None:
     port = launcher.free_port()
     assert launcher.wait_until_ready(port, timeout=0.5) is False
 
-
-# -- the CPU escape hatch ---------------------------------------------------
-
-
-def test_cuda_skipped_reads_the_flag(monkeypatch) -> None:
-    monkeypatch.delenv("S2T_SKIP_CUDA", raising=False)
-    assert launcher._cuda_skipped() is False
-    monkeypatch.setenv("S2T_SKIP_CUDA", "0")
-    assert launcher._cuda_skipped() is False
-    monkeypatch.setenv("S2T_SKIP_CUDA", "")
-    assert launcher._cuda_skipped() is False
-    monkeypatch.setenv("S2T_SKIP_CUDA", "1")
-    assert launcher._cuda_skipped() is True

@@ -24,7 +24,8 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO
-from urllib.request import urlopen
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 __all__ = ["ensure_cuda", "has_nvidia_driver", "WHEELS", "MARKER"]
 
@@ -171,28 +172,72 @@ def _register(target: Path, log: logging.Logger | None) -> bool:
     return True
 
 
+def _download(
+    wheel: Wheel, part: Path, log: logging.Logger | None, *, allow_resume: bool = True
+) -> str | None:
+    """Fetch ``wheel`` into ``part``, resuming a previous attempt when possible.
+
+    Returns the SHA-256 of everything now on disk, or None if the transfer failed.
+    Resuming is safe because the caller checks that digest against the pinned one:
+    a partial file from a different build, or a corrupted one, simply fails the
+    check and is discarded.
+    """
+    offset = part.stat().st_size if (allow_resume and part.exists()) else 0
+    digest = hashlib.sha256()
+
+    if offset:
+        if log:
+            log.info("resuming %s at %.0f MB", wheel.name, offset / 1e6)
+        try:
+            with part.open("rb") as existing:
+                while chunk := existing.read(_CHUNK):
+                    digest.update(chunk)
+        except OSError:
+            return _download(wheel, part, log, allow_resume=False)
+
+    try:
+        with part.open("ab" if offset else "wb") as handle:
+            resumed = _stream(
+                wheel.url, _HashingWriter(handle, digest), wheel.size, log, offset
+            )
+    except HTTPError as exc:
+        # 416 means the server considers our partial file complete or too long.
+        if offset and exc.code == 416:
+            part.unlink(missing_ok=True)
+            return _download(wheel, part, log, allow_resume=False)
+        if log:
+            log.warning("downloading %s failed: %s", wheel.name, exc)
+        return None
+    except OSError as exc:
+        if log:
+            log.warning("downloading %s failed: %s", wheel.name, exc)
+        return None
+
+    if offset and not resumed:
+        # The server ignored the range and would have sent the whole file again.
+        part.unlink(missing_ok=True)
+        return _download(wheel, part, log, allow_resume=False)
+
+    return digest.hexdigest()
+
+
 def _fetch(wheel: Wheel, target: Path, log: logging.Logger | None) -> bool:
     """Download one wheel, verify it, extract its DLLs, and clean up."""
     target.mkdir(parents=True, exist_ok=True)
     part = target / f"{wheel.name}.part"
-    digest = hashlib.sha256()
 
-    try:
-        with part.open("wb") as handle:
-            _stream(wheel.url, _HashingWriter(handle, digest), wheel.size, log)
-    except OSError as exc:
-        if log:
-            log.warning("downloading %s failed: %s", wheel.name, exc)
+    checksum = _download(wheel, part, log)
+    if checksum is None:
         part.unlink(missing_ok=True)
         return False
 
-    if digest.hexdigest() != wheel.sha256:
+    if checksum != wheel.sha256:
         if log:
             log.error(
                 "%s failed its checksum (expected %s, got %s)",
                 wheel.name,
                 wheel.sha256,
-                digest.hexdigest(),
+                checksum,
             )
         part.unlink(missing_ok=True)
         return False
@@ -223,11 +268,23 @@ class _HashingWriter:
         return self._handle.write(chunk)
 
 
-def _stream(url: str, handle, size: int, log: logging.Logger | None) -> None:
-    """Copy ``url`` into ``handle``, printing progress to the console."""
-    with urlopen(url) as response:  # noqa: S310 - a pinned https URL
-        total = int(response.headers.get("Content-Length") or size or 0)
-        done = 0
+def _stream(
+    url: str, handle, size: int, log: logging.Logger | None, offset: int = 0
+) -> bool:
+    """Copy ``url`` into ``handle``, printing progress to the console.
+
+    Returns False, having written nothing, when a range was requested and the
+    server answered with the whole file instead.
+    """
+    request = Request(url)
+    if offset:
+        request.add_header("Range", f"bytes={offset}-")
+
+    with urlopen(request) as response:  # noqa: S310 - a pinned https URL
+        if offset and response.status != 206:
+            return False
+        total = int(response.headers.get("Content-Length") or 0) + offset or size
+        done = offset
         while True:
             chunk = response.read(_CHUNK)
             if not chunk:
@@ -242,6 +299,7 @@ def _stream(url: str, handle, size: int, log: logging.Logger | None) -> None:
                     flush=True,
                 )
     print(flush=True)
+    return True
 
 
 def _extract_dlls(archive_path: Path, target: Path) -> int:

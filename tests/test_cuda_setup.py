@@ -30,6 +30,18 @@ def _wheel_bytes() -> bytes:
     return buffer.getvalue()
 
 
+def _stub_stream(payload: bytes, *, honour_range: bool = True):
+    """Stand in for the network: serve ``payload`` from the requested offset."""
+
+    def stream(url, handle, size, log, offset=0):
+        if offset and not honour_range:
+            return False
+        handle.write(payload[offset:])
+        return True
+
+    return stream
+
+
 @pytest.fixture
 def fake_wheel(tmp_path: Path) -> Path:
     path = tmp_path / "fake.whl"
@@ -176,7 +188,7 @@ def test_download_rejects_a_hash_mismatch(monkeypatch, tmp_path: Path) -> None:
         sha256="0" * 64,  # deliberately wrong
         size=len(payload),
     )
-    monkeypatch.setattr(cuda_setup, "_stream", lambda url, handle, size, log: handle.write(payload))
+    monkeypatch.setattr(cuda_setup, "_stream", _stub_stream(payload))
 
     assert cuda_setup._fetch(wheel, tmp_path, None) is False
     assert list(tmp_path.glob("*")) == []  # the .part file is cleaned up
@@ -190,12 +202,98 @@ def test_download_accepts_a_matching_hash(monkeypatch, tmp_path: Path) -> None:
         sha256=hashlib.sha256(payload).hexdigest(),
         size=len(payload),
     )
-    monkeypatch.setattr(cuda_setup, "_stream", lambda url, handle, size, log: handle.write(payload))
+    monkeypatch.setattr(cuda_setup, "_stream", _stub_stream(payload))
 
     assert cuda_setup._fetch(wheel, tmp_path, None) is True
     assert (tmp_path / "cudnn_ops64_9.dll").exists()
     assert not list(tmp_path.glob("*.part"))
     assert not list(tmp_path.glob("*.whl"))
+
+
+def test_download_resumes_a_partial_file(monkeypatch, tmp_path: Path) -> None:
+    payload = _wheel_bytes()
+    wheel = cuda_setup.Wheel(
+        name="fake.whl",
+        url="https://example.invalid/fake.whl",
+        sha256=hashlib.sha256(payload).hexdigest(),
+        size=len(payload),
+    )
+    part = tmp_path / "fake.whl.part"
+    part.write_bytes(payload[:100])  # a previous attempt, interrupted
+
+    seen: list[int] = []
+
+    def stream(url, handle, size, log, offset=0):
+        seen.append(offset)
+        handle.write(payload[offset:])
+        return True
+
+    monkeypatch.setattr(cuda_setup, "_stream", stream)
+
+    assert cuda_setup._download(wheel, part, None) == wheel.sha256
+    assert seen == [100]  # it asked for the remainder, not the whole file
+
+
+def test_download_restarts_when_the_server_ignores_the_range(
+    monkeypatch, tmp_path: Path
+) -> None:
+    payload = _wheel_bytes()
+    wheel = cuda_setup.Wheel(
+        name="fake.whl",
+        url="https://example.invalid/fake.whl",
+        sha256=hashlib.sha256(payload).hexdigest(),
+        size=len(payload),
+    )
+    part = tmp_path / "fake.whl.part"
+    part.write_bytes(payload[:100])
+
+    monkeypatch.setattr(cuda_setup, "_stream", _stub_stream(payload, honour_range=False))
+
+    # Falls back to a clean download rather than appending to the partial file.
+    assert cuda_setup._download(wheel, part, None) == wheel.sha256
+
+
+def test_download_restarts_on_a_416(monkeypatch, tmp_path: Path) -> None:
+    from urllib.error import HTTPError
+
+    payload = _wheel_bytes()
+    wheel = cuda_setup.Wheel(
+        name="fake.whl",
+        url="https://example.invalid/fake.whl",
+        sha256=hashlib.sha256(payload).hexdigest(),
+        size=len(payload),
+    )
+    part = tmp_path / "fake.whl.part"
+    part.write_bytes(payload + b"trailing junk")  # longer than the real file
+
+    def stream(url, handle, size, log, offset=0):
+        if offset:
+            raise HTTPError(url, 416, "Range Not Satisfiable", {}, None)
+        handle.write(payload)
+        return True
+
+    monkeypatch.setattr(cuda_setup, "_stream", stream)
+
+    assert cuda_setup._download(wheel, part, None) == wheel.sha256
+
+
+def test_a_stale_partial_from_another_build_is_caught_by_the_hash(
+    monkeypatch, tmp_path: Path
+) -> None:
+    payload = _wheel_bytes()
+    wheel = cuda_setup.Wheel(
+        name="fake.whl",
+        url="https://example.invalid/fake.whl",
+        sha256=hashlib.sha256(payload).hexdigest(),
+        size=len(payload),
+    )
+    part = tmp_path / "fake.whl.part"
+    part.write_bytes(b"bytes from a completely different file")
+
+    monkeypatch.setattr(cuda_setup, "_stream", _stub_stream(payload))
+
+    assert cuda_setup._fetch(wheel, tmp_path, None) is False
+    assert not part.exists()
 
 
 # -- the pinned table ------------------------------------------------------

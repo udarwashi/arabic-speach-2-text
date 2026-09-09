@@ -185,6 +185,18 @@ built exe launches; browser opens; a real MP3 transcribes end to end; TXT/SRT/VT
 second launch is fast and re-downloads nothing; on a GPU machine the log records `cuda`;
 with `S2T_SKIP_CUDA=1` it records `cpu` and still completes.
 
+## Measured outcome
+
+Built on 2026-09-09 with Windows Python 3.11.6, PyInstaller 6.22.2 and Inno Setup 6.
+
+| | |
+| --- | --- |
+| `dist\speech2text\` (onedir bundle) | 436 MB, of which ffmpeg + ffprobe are 197 MB |
+| `speech2text-setup.exe` | **116 MB** |
+| Silent install | exit 0, no UAC prompt, per-user under `%LOCALAPPDATA%\Programs\speech2text` |
+| Start Menu entry | `تحويل الصوت إلى نص.lnk`, correct Arabic |
+| CUDA bundled | none — confirmed absent from `_internal\` |
+
 ## Known rough edges
 
 - **SmartScreen.** The unsigned installer triggers "Windows protected your PC". The user

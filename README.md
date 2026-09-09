@@ -213,6 +213,10 @@ else does. The two wheels are pinned to the versions in `requirements-gpu.txt` a
 by SHA-256 before they are opened; the DLLs are registered with `os.add_dll_directory`,
 which is what Windows needs since Python 3.8 stopped searching `PATH` for dependent DLLs.
 
+An interrupted download resumes rather than restarting, which matters when 1.1 GB takes
+twenty minutes; the SHA-256 check still covers the whole file, so a stale or corrupted
+partial is simply discarded.
+
 No card, no network, or a bad checksum: it logs and returns, and `transcriber.resolve_device`
 reports `cpu` by itself. `S2T_SKIP_CUDA=1` forces the CPU path for testing.
 

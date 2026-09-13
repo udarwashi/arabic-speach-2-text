@@ -104,6 +104,9 @@ def make_client(tmp_path, monkeypatch):
 
     def factory(transcriber=None, **env: object) -> TestClient:
         monkeypatch.setenv("S2T_WORK_DIR", str(tmp_path / "work"))
+        # The developer's own .env must not decide how the suite runs: the gate
+        # is off unless a test asks for it via S2T_PASSWORD.
+        monkeypatch.setenv("S2T_PASSWORD", "")
         for key, value in env.items():
             monkeypatch.setenv(key, str(value))
         get_settings.cache_clear()

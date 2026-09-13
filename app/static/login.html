@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>تحويل الصوت إلى نص — تسجيل الدخول</title>
+  <meta name="theme-color" content="#f0eee6" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#1b1a18" media="(prefers-color-scheme: dark)" />
+  <link rel="icon" href="/static/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="gate-body">
+  <main class="gate">
+    <div class="card gate-card">
+      <span class="logo gate-logo" aria-hidden="true">
+        <svg viewBox="0 0 44 44" role="img">
+          <rect width="44" height="44" rx="13" class="logo-plate" />
+          <g class="logo-wave" stroke-linecap="round" stroke-width="2.6" fill="none">
+            <path d="M31.5 15.5v13" />
+            <path d="M26.5 12v20" />
+            <path d="M21.5 17.5v9" />
+          </g>
+          <g class="logo-text" stroke-linecap="round" stroke-width="2.6" fill="none">
+            <path d="M16.5 18h-5" />
+            <path d="M16.5 26h-3" />
+          </g>
+        </svg>
+      </span>
+
+      <h1>تحويل الصوت إلى نص</h1>
+      <p class="sub">هذه الصفحة محمية بكلمة مرور. أدخلها للمتابعة.</p>
+
+      <form class="gate-form" id="gate-form" autocomplete="off">
+        <label class="field">
+          <span>كلمة المرور</span>
+          <input type="password" id="password" name="password" required
+                 autocomplete="current-password" autofocus dir="ltr"
+                 aria-describedby="gate-error" />
+        </label>
+        <button type="submit" class="primary" id="gate-submit">دخول</button>
+      </form>
+
+      <p class="gate-error" id="gate-error" role="alert" hidden></p>
+      <p class="gate-hint">بعد ثلاث محاولات خاطئة يُقفل الدخول مؤقتاً.</p>
+    </div>
+  </main>
+
+  <script src="/static/login.js"></script>
+</body>
+</html>

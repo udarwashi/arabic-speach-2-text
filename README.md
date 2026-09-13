@@ -36,7 +36,30 @@ S2T_PORT=8100 ./run.sh   # if port 8000 is taken
 without a system-wide CUDA install. The first transcription downloads the selected model
 (~1.6 GB for the default) and the UI shows a "preparing the model" step while it does.
 
-Open the page, drop in a file, pick a model, press **ابدأ التحويل**.
+Open the page, type the password (see below), drop in a file, pick a model, press
+**ابدأ التحويل**.
+
+## Password
+
+The app is closed by default in this install: `S2T_PASSWORD` in `.env` is the one shared
+password, and nothing — page, API or SSE stream — is reachable without it. Only the login
+page and the assets it needs are public.
+
+```bash
+cp .env.example .env     # then edit S2T_PASSWORD
+S2T_PASSWORD= ./run.sh   # or: run this once with the gate switched off
+```
+
+- A correct password sets a signed, `HttpOnly` session cookie valid for `S2T_SESSION_SECONDS`
+  (12 hours). The password itself is never stored in the cookie.
+- **Three wrong guesses lock that client out for `S2T_LOCKOUT_SECONDS` (15 minutes).** While
+  locked, even the correct password is refused — the login page counts the lock down.
+- Counters and the cookie-signing key are in memory. Restarting the server clears every
+  lock and every session, which is also how you recover if you lock yourself out.
+- Lockouts are counted per client address, and they do not touch sessions that are already
+  signed in.
+- `.env` is gitignored. The password is compared with `hmac.compare_digest`, but it travels
+  in clear text over plain HTTP — put the app behind TLS before exposing it beyond localhost.
 
 ## Models
 
@@ -94,6 +117,14 @@ All optional, all read at startup.
 | `S2T_WORK_DIR` | `./work` | Scratch space for uploads (files are deleted after each job) |
 | `S2T_MODEL_DIR` | `./models` | Where model weights are cached; set to `""` to use the shared Hugging Face cache |
 | `S2T_HOST` / `S2T_PORT` | `127.0.0.1` / `8000` | Bind address, read by `run.sh` |
+| `S2T_PASSWORD` | *(empty)* | Login password; empty means no login page at all |
+| `S2T_MAX_ATTEMPTS` | `3` | Wrong guesses before a client is locked out |
+| `S2T_LOCKOUT_SECONDS` | `900` | How long that lockout lasts |
+| `S2T_SESSION_SECONDS` | `43200` | How long a successful login stays valid |
+| `S2T_ENV_FILE` | `./.env` | Where to read the file above from |
+
+Every one of these can come from `.env` instead (see `.env.example`). A real environment
+variable always wins over the file, so `S2T_PASSWORD= ./run.sh` opens the app for one run.
 
 ## API
 
@@ -105,6 +136,16 @@ All optional, all read at startup.
 | `GET` | `/api/jobs/{id}/download?fmt=txt\|srt\|vtt` | Transcript as a file |
 | `DELETE` | `/api/jobs/{id}` | Cancel and forget a job |
 | `GET` | `/api/models`, `/api/health` | Metadata for the UI; runtime and device info |
+| `POST` | `/api/login` | Form `password` → session cookie; `401` with attempts left, `429` when locked |
+| `POST` | `/api/logout` | Drops the session cookie |
+
+With a password set, every row above answers `401` without the session cookie, and browser
+navigations are redirected to `/login`:
+
+```bash
+curl -c jar -d "password=…" http://127.0.0.1:8000/api/login
+curl -b jar http://127.0.0.1:8000/api/models
+```
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/transcribe \
@@ -129,6 +170,60 @@ one decode runs at a time — a 4 GB GPU cannot hold two large models.
   subtitle players and text editors align them correctly even when a line starts with a
   digit or a Latin word.
 
+## Windows desktop build
+
+For handing the app to someone who has no Python, no ffmpeg and no intention of opening a
+terminal. The result is one `speech2text-setup.exe`: they double-click it, and afterwards a
+Start Menu entry starts the server on a free localhost port and opens their browser at it.
+Nothing is hosted anywhere — the model runs on their machine, as it does here.
+
+```powershell
+# On Windows (PyInstaller cannot cross-compile), from a native path -- not \\wsl.localhost\...
+winget install JRSoftware.InnoSetup
+.\packaging\build.ps1          # -SkipInstaller to stop after PyInstaller
+# -> dist\speech2text-setup.exe
+```
+
+`build.ps1` creates its own `.venv-win`, fetches a static ffmpeg build into `packaging/bin/`,
+runs PyInstaller over `packaging/speech2text.spec`, and wraps the result with Inno Setup. It
+installs `requirements.txt` only: `requirements-gpu.txt` would add ~1.5 GB of CUDA libraries
+to the bundle, which is exactly what the on-demand download below avoids.
+
+### What the packaged app does differently
+
+Nothing in `app/` changes. `app/launcher.py` arranges the process before anything else loads:
+
+| Problem when frozen | What the launcher does |
+| --- | --- |
+| `PROJECT_ROOT` is a temp directory, so the 1.6 GB model would be re-downloaded every launch | Sets `S2T_MODEL_DIR`/`S2T_WORK_DIR` to `%LOCALAPPDATA%\speech2text` **before** the `lru_cache`d `get_settings()` runs |
+| The user has no ffmpeg | Prepends the bundled `bin/` to `PATH`, where `audio.py` already looks |
+| A fixed port may be taken | Binds `127.0.0.1:0` and lets the OS choose |
+| No terminal to read errors in | Rotating log at `%LOCALAPPDATA%\speech2text\logs\` |
+| No obvious way to quit | The console window is the quit button, labelled in Arabic |
+
+The password gate is off in this build: no `.env` ships, so `S2T_PASSWORD` is empty and
+`auth.py` leaves every route open. It guards a server bound to the user's own loopback.
+
+### GPU without a 2 GB installer
+
+CTranslate2 needs cuDNN and cuBLAS, ~1.5 GB installed, for the fast path. Bundling them
+would burden every user with a GPU-only payload, so `app/cuda_setup.py` fetches them on
+first run and only when `nvcuda.dll` loads — a DLL the NVIDIA driver installs and nothing
+else does. The two wheels are pinned to the versions in `requirements-gpu.txt` and verified
+by SHA-256 before they are opened; the DLLs are registered with `os.add_dll_directory`,
+which is what Windows needs since Python 3.8 stopped searching `PATH` for dependent DLLs.
+
+An interrupted download resumes rather than restarting, which matters when 1.1 GB takes
+twenty minutes; the SHA-256 check still covers the whole file, so a stale or corrupted
+partial is simply discarded.
+
+No card, no network, or a bad checksum: it logs and returns, and `transcriber.resolve_device`
+reports `cpu` by itself. `S2T_SKIP_CUDA=1` forces the CPU path for testing.
+
+New to desktop packaging? `docs/desktop-app-primer.md` covers the background — what an `.exe`
+is, how PyInstaller's analysis works, `sys._MEIPASS`, DLL search order, installers and code
+signing.
+
 ## Project layout
 
 ```
@@ -139,11 +234,15 @@ app/
   jobs.py         job records, SSE fan-out, TTL purge
   worker.py       the pipeline: convert → load → decode → publish
   formats.py      segments → TXT / SRT / VTT
-  main.py         routes
-  static/         index.html, styles.css, app.js (no build step)
+  auth.py         password check, session cookies, lockout counters
+  main.py         routes + the password gate
+  launcher.py     desktop entry point: paths, PATH, port, browser, console
+  cuda_setup.py   on-demand cuDNN/cuBLAS download for the packaged build
+  static/         index.html, login.html, styles.css, app.js, login.js (no build step)
   static/fonts/   vendored IBM Plex Sans Arabic + Noto Naskh Arabic (OFL)
+packaging/        PyInstaller spec, Inno Setup script, build.ps1
 tests/            pytest suite
-docs/superpowers/specs/   design document
+docs/             desktop-app-primer.md, superpowers/specs, superpowers/plans
 ```
 
 ## Tests

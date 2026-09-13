@@ -8,6 +8,7 @@ const el = (id) => document.getElementById(id);
 
 const ui = {
   deviceBadge: el('device-badge'),
+  logoutBtn: el('logout-btn'),
   dropzone: el('dropzone'),
   fileInput: el('file-input'),
   dzHint: el('dz-hint'),
@@ -188,10 +189,21 @@ async function loadHealth() {
     if (runtime.warnings && runtime.warnings.length) {
       ui.deviceBadge.title = runtime.warnings.join('\n');
     }
+    // Only worth offering when there is a session to end.
+    ui.logoutBtn.hidden = !data.auth;
   } catch (_) {
     ui.deviceBadge.textContent = 'الخادم غير متاح';
   }
 }
+
+ui.logoutBtn.addEventListener('click', async () => {
+  ui.logoutBtn.disabled = true;
+  try {
+    await fetch('/api/logout', { method: 'POST' });
+  } finally {
+    window.location.replace('/login');
+  }
+});
 
 /* ---------- file selection ---------- */
 

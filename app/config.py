@@ -1,7 +1,8 @@
 """Settings and the registry of Whisper models offered to the user.
 
 Everything configurable lives here and is read once from ``S2T_*`` environment
-variables, so no other module needs to touch ``os.environ``.
+variables (optionally by way of a ``.env`` file), so no other module needs to
+touch ``os.environ``.
 """
 
 from __future__ import annotations
@@ -70,6 +71,36 @@ LANGUAGES: dict[str, str] = {
 }
 
 
+def load_dotenv(path: Path | None = None) -> None:
+    """Copy ``KEY=value`` lines from a ``.env`` file into the environment.
+
+    A real environment variable always wins, so the file is a default and never
+    an override — that keeps ``S2T_PASSWORD= ./run.sh`` and the test suite able
+    to switch settings off. Deliberately tiny: no dependency, no interpolation.
+    """
+    env_file = path or Path(os.environ.get("S2T_ENV_FILE", PROJECT_ROOT / ".env"))
+    try:
+        raw = env_file.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].lstrip()
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
     if raw is None or not raw.strip():
@@ -93,14 +124,24 @@ class Settings:
     job_ttl_seconds: int
     work_dir: Path
     model_dir: Path | None
+    password: str = ""       # empty = the app is open, no login page
+    max_attempts: int = 3    # wrong guesses allowed before the lockout
+    lockout_seconds: int = 900
+    session_seconds: int = 12 * 3600
 
     @property
     def max_upload_mb(self) -> int:
         return self.max_upload_bytes // (1024 * 1024)
 
+    @property
+    def auth_enabled(self) -> bool:
+        return bool(self.password)
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    load_dotenv()
+
     default_model = os.environ.get("S2T_MODEL", DEFAULT_MODEL)
     if default_model not in MODEL_REGISTRY:
         raise ValueError(
@@ -127,4 +168,8 @@ def get_settings() -> Settings:
         job_ttl_seconds=_env_int("S2T_JOB_TTL_SECONDS", 3600),
         work_dir=work_dir,
         model_dir=model_dir,
+        password=os.environ.get("S2T_PASSWORD", "").strip(),
+        max_attempts=_env_int("S2T_MAX_ATTEMPTS", 3),
+        lockout_seconds=_env_int("S2T_LOCKOUT_SECONDS", 900),
+        session_seconds=_env_int("S2T_SESSION_SECONDS", 12 * 3600),
     )
